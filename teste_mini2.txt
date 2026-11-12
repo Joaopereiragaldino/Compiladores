@@ -1,0 +1,21 @@
+int i;
+int global;
+
+int calculo(int x, int y);
+int mostrar(int valor);
+
+begin
+    i = 5;
+    global = 10;
+
+    calculo(i + 5, global);
+    mostrar(i);
+end
+
+int calculo(int x, int y) {
+    x = x + y;
+}
+
+int mostrar(int valor) begin
+    write valor;
+end

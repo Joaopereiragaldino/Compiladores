@@ -333,15 +333,31 @@ type_token *keyWordFind(char *word) {
 
 /**
  * @brief Espia o proximo caractere util (ignora espacos) sem consumi-lo.
- *        Usado para decidir, por exemplo, se "a = 5" e uma atribuicao simples
- *        (proximo caractere e ';') ou o inicio de uma expressao ("a = 5 + 1").
+ *        Nao usa ftell/fseek (comportamento indefinido apos ungetc em modo texto).
+ *        Le caracteres descartando espacos e devolve todos com ungetc.
  */
 int peekChar(void) {
-    long pos_salva = ftell(input_file);
-    int c = fgetc(input_file);
-    while (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+    int buf[64]; // buffer para chars lidos (limite seguro)
+    int n = 0;
+    int c;
+
+    // Le chars ate encontrar um nao-espaco
+    while (1) {
         c = fgetc(input_file);
+        if (c == EOF) {
+            break;
+        }
+        buf[n++] = c;
+        if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
+            break;
+        }
+        if (n >= 63) break; // seguranca
     }
-    fseek(input_file, pos_salva, SEEK_SET);
-    return c;
+
+    // Devolve todos os chars lidos em ordem inversa
+    while (n > 0) {
+        ungetc(buf[--n], input_file);
+    }
+
+    return c; // o char nao-espaco encontrado (ou EOF)
 }

@@ -1,0 +1,39 @@
+int i;
+float f;
+char c;
+string s;
+int global;
+
+int calculo(int x, int y);
+int mostrar(int valor);
+
+begin
+    i = 0;
+    f = 1.5;
+    c = 'A';
+    s = "Teste Compilador";
+    global = 10;
+
+    read i;
+
+    if (i < 10) {
+        i = i + 1;
+    } else {
+        i = 0;
+    }
+
+    while (i > 0) begin
+        i = i - 1;
+    end
+
+    calculo(x, y);
+    mostrar(valor);
+end
+
+int calculo(int x, int y) {
+    x = x + y;
+}
+
+int mostrar(int valor) begin
+    write valor;
+end

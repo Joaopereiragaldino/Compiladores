@@ -42,23 +42,36 @@ int program (void) {
 
     // Delimita a funcao principal com begin e end
     if (lookahead->tag == BEGIN) {
-        match(BEGIN);
-    } else {
-        printf("[ERRO] Esperado 'begin' para iniciar o bloco principal.\n");
+        if (!match(BEGIN)) return false;
+    } 
+    else if(lookahead->tag == OPEN_BRACE){
+        if (!match(OPEN_BRACE)) return false;
+    }
+    else {
+        printf("[ERRO] Esperado 'begin' ou '}' para iniciar o bloco principal.\n");
         erro_sintatico = true;
+        return false;
     }
 
     ok2 = statements();
 
     if (lookahead->tag == END) {
-        match(END);
-    } else {
-        printf("[ERRO] Esperado 'end' para encerrar o bloco principal.\n");
+        if (!match(END)) return false;
+    } 
+    else if(lookahead->tag == CLOSE_BRACE){
+        if (!match(CLOSE_BRACE)) return false;
+    }
+    else {
+        printf("[ERRO] Esperado 'end' ou '{' para encerrar o bloco principal.\n");
         erro_sintatico = true;
+        return false;
     }
 
     gen_epilog_code(); // Encerra a execucao do programa principal antes das funcoes
-    func_codes();      // Compila o codigo das funcoes prototipadas
+    // So analisa funcoes se o bloco principal foi encerrado corretamente
+    if (!erro_sintatico) {
+        func_codes();      // Compila o codigo das funcoes prototipadas
+    }
 
     if (lookahead->tag != ENDTOKEN) {
         printf("[ERRO] Encontrado codigo ou texto inesperado no fim do arquivo: '%s'\n", lookahead->lexema);
@@ -519,7 +532,7 @@ int statement (void) {
 
             search_symbol_func = sym_func_find(id_name);
             if (search_symbol_func == NULL) {
-                printf("[ERRO] Tentativa de chamada de funcao nao declarada: '%s'\n", id_name);
+                printf("[ERRO SEMANTICO] Funcao '%s' nao declarada/prototipada.\n", id_name);
                 erro_sintatico = true;
                 return false;
             }
@@ -528,14 +541,12 @@ int statement (void) {
             int erro_semantico = false;
 
             while(lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN){
-                char lexema_arg[MAX_CHAR];
                 int arg_tag = lookahead->tag;
                 char *param_name;
                 int param_type;
-                strcpy(lexema_arg, lookahead->lexema);
 
-                if (cont_params >= search_symbol_func->n_params) {   // argumentos demais
-                    printf("[ERRO SEMANTICO] Chamada de '%s' com argumentos demais (o prototipo declara %d).\n",
+                if (cont_params >= search_symbol_func->n_params) {
+                    printf("[ERRO SEMANTICO] Chamada de '%s' com argumentos demais (prototipo declara %d).\n",
                            id_name, search_symbol_func->n_params);
                     erro_semantico = true;
                     while (lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN && lookahead->tag != SEMICOLON) {
@@ -546,55 +557,69 @@ int statement (void) {
                 param_name = search_symbol_func->params[cont_params].name;
                 param_type = search_symbol_func->params[cont_params].type;
 
-                if (arg_tag == ID && (peekChar() == ',' || peekChar() == ')')) {
-                    // id puro: MESMO id e mesmo tipo do parametro. O valor ja esta na global: nao gera codigo.
-                    type_symbol_table_entry *var = sym_find(lexema_arg, &global_symbol_table_variables);
-                    if (var == NULL) {
-                        printf("[ERRO SEMANTICO] Variavel '%s' nao declarada usada como parametro.\n", lexema_arg);
+                // --- Argumento: constante CHAR ---
+                if (arg_tag == CHAR_VAL) {
+                    if (param_type != CHAR) {
+                        printf("[ERRO SEMANTICO] Argumento %d (char) incompativel com o prototipo na chamada de '%s'.\n", cont_params + 1, id_name);
                         erro_semantico = true;
-                    } else if (strcmp(lexema_arg, param_name) != 0) {
-                        printf("[ERRO SEMANTICO] Chamada de '%s': o argumento %d deveria ter o id '%s' (do prototipo), mas foi '%s'.\n",
-                               id_name, cont_params + 1, param_name, lexema_arg);
-                        erro_semantico = true;
-                    } else if (var->type != param_type) {
-                        printf("[ERRO SEMANTICO] Parametro %d incompativel na chamada da funcao '%s'.\n", cont_params + 1, id_name);
-                        erro_semantico = true;
+                    } else {
+                        char lexema_arg[MAX_CHAR];
+                        strcpy(lexema_arg, lookahead->lexema);
+                        genAssignChar(param_name, lexema_arg);
                     }
-                    match(ID);
-                }
-                else if (arg_tag == NUM_INT && (peekChar() == ',' || peekChar() == ')') && param_type == INT) {
-                    genAssignInt(param_name, lexema_arg);
-                    match(NUM_INT);
-                }
-                else if ((arg_tag == NUM_FLOAT || arg_tag == NUM_INT) && param_type == FLOAT) {
-                    char val_float[MAX_CHAR + 4];
-                    strcpy(val_float, lexema_arg);
-                    if (arg_tag == NUM_INT) strcat(val_float, ".0");
-                    genAssignFloat(param_name, val_float);
-                    match(arg_tag);
-                }
-                else if (arg_tag == CHAR_VAL && param_type == CHAR) {
-                    genAssignChar(param_name, lexema_arg);
                     match(CHAR_VAL);
                 }
-                else if (arg_tag == STRING_VAL && param_type == STRING) {
-                    genAssignString(param_name, lexema_arg);
+                // --- Argumento: constante STRING ---
+                else if (arg_tag == STRING_VAL) {
+                    if (param_type != STRING) {
+                        printf("[ERRO SEMANTICO] Argumento %d (string) incompativel com o prototipo na chamada de '%s'.\n", cont_params + 1, id_name);
+                        erro_semantico = true;
+                    } else {
+                        char lexema_arg[MAX_CHAR];
+                        strcpy(lexema_arg, lookahead->lexema);
+                        genAssignString(param_name, lexema_arg);
+                    }
                     match(STRING_VAL);
                 }
-                else if (param_type == INT && arg_tag != STRING_VAL && arg_tag != NUM_FLOAT && arg_tag != CHAR_VAL) {
-                    if (E()) {                   
-                        gen_assign_var(param_name);
-                    } else {
-                        printf("[ERRO] Expressao invalida no argumento %d da chamada de '%s'.\n", cont_params + 1, id_name);
-                        erro_semantico = true;
-                        while (lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN && lookahead->tag != SEMICOLON) {
-                            lookahead = getToken();
+                // --- Argumento: expressao aritmetica/numerica (INT ou FLOAT) ---
+                else if (arg_tag == NUM_INT || arg_tag == NUM_FLOAT || arg_tag == ID || arg_tag == OPEN_PAR) {
+                    if (param_type == FLOAT) {
+                        // Argumento float: apenas constante float/int simples
+                        char lexema_arg[MAX_CHAR + 4];
+                        strcpy(lexema_arg, lookahead->lexema);
+                        if (arg_tag == NUM_INT) {
+                            strcat(lexema_arg, ".0");
+                            genAssignFloat(param_name, lexema_arg);
+                            match(NUM_INT);
+                        } else if (arg_tag == NUM_FLOAT) {
+                            genAssignFloat(param_name, lexema_arg);
+                            match(NUM_FLOAT);
+                        } else {
+                            printf("[ERRO SEMANTICO] Argumento %d incompativel com parametro float na chamada de '%s'.\n", cont_params + 1, id_name);
+                            erro_semantico = true;
+                            while (lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN && lookahead->tag != SEMICOLON && lookahead->tag != COMMA)
+                                lookahead = getToken();
                         }
-                        break;
+                    } else if (param_type == INT) {
+                        // Argumento int: pode ser expressao aritmetica completa (E)
+                        if (E()) {
+                            gen_assign_var(param_name);
+                        } else {
+                            printf("[ERRO] Expressao invalida no argumento %d da chamada de '%s'.\n", cont_params + 1, id_name);
+                            erro_semantico = true;
+                            while (lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN && lookahead->tag != SEMICOLON && lookahead->tag != COMMA)
+                                lookahead = getToken();
+                        }
+                    } else if (param_type == STRING || param_type == CHAR) {
+                        printf("[ERRO SEMANTICO] Argumento %d (numero/id) incompativel com o prototipo na chamada de '%s'.\n", cont_params + 1, id_name);
+                        erro_semantico = true;
+                        while (lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN && lookahead->tag != SEMICOLON && lookahead->tag != COMMA)
+                            lookahead = getToken();
                     }
                 }
+                // --- Tipo desconhecido/incompativel ---
                 else {
-                    printf("[ERRO SEMANTICO] Parametro %d incompativel na chamada da funcao '%s'.\n", cont_params + 1, id_name);
+                    printf("[ERRO SEMANTICO] Argumento %d incompativel com o prototipo na chamada de '%s'.\n", cont_params + 1, id_name);
                     erro_semantico = true;
                     while (lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN && lookahead->tag != SEMICOLON) {
                         lookahead = getToken();
@@ -610,24 +635,24 @@ int statement (void) {
                 }
             }
 
-            // Verifica a quantidade total de parametros comparando com o prototipo (TSF)
+            // Verifica quantidade total de parametros
             if (cont_params != search_symbol_func->n_params && !erro_semantico) {
-                printf("[ERRO SEMANTICO] Quantidade de parametros incorreta na chamada de '%s'. Esperado: %d, Informado: %d.\n", 
+                printf("[ERRO SEMANTICO] Quantidade incorreta de argumentos na chamada de '%s'. Esperado: %d, Informado: %d.\n",
                        id_name, search_symbol_func->n_params, cont_params);
                 erro_semantico = true;
             }
 
             if (!match(CLOSE_PAR)){
-                printf("[ERRO] Era esperado ')' no fechamento da funcao: '%s' \n", id_name);
+                printf("[ERRO] Era esperado ')' no fechamento da chamada de '%s'.\n", id_name);
                 erro_sintatico = true;
                 return false;
             }
-            
+
             int ok_semi = match(SEMICOLON);
 
             if (!erro_semantico && ok_semi) {
                 search_symbol_func->called = 1;
-                gen_jal(search_symbol_func->label); // Gera a instrucao de salto (jal / call)
+                gen_jal(search_symbol_func->label); // Gera instrucao JAL (call)
                 return true;
             } else {
                 erro_sintatico = true;
