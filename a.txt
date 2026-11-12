@@ -1,0 +1,135 @@
+Houve avanço grande: os requisitos 1 e 3 estão praticamente cumpridos, mas o Requisito 2 ainda tem falhas, e a geração de código dos argumentos produz resultados errados. Compilei, montei com nasm, executei e testei 20 casos de erro.
+
+O que agora está certo
+program() com begin/end, gen_epilog_code() ao fim do principal e func_codes() depois.
+declaration() completa: consome ) e ;, chama sym_func_declare e declara os parâmetros na TS global.
+Léxico com ,, label com 256 caracteres, printSTFunc() com quebras de linha, cqo no genDiv e BEGIN como fim das declarações.
+Os programas simples e os com funções e chamadas de literal inteiro compilam e montam. soma(3,4) deixa a = 7.
+Funções não declaradas, quantidade errada, tipo incompatível e implementação de função não prototipada dão erro.
+O que ainda falha
+Teste	Resultado atual	Esperado
+f(a) com parâmetro chamado x	Compila	Erro: o enunciado exige o mesmo id
+soma(x, y) com x, y sendo os próprios parâmetros	Gera mov dword [x], x, que grava o endereço de x. A soma dá 8405016	15
+f('k') com parâmetro char	nasm falha: symbol k not defined	Compilar e montar
+f(2.5) com parâmetro float	nasm falha: expression syntax error	Compilar e montar
+g(a+1) (expressão com id)	Erro de compilação ('+', esperado ))	Aceitar, pois o enunciado prevê id ( [id|E]* )
+Duas implementações da mesma função, ou assinatura diferente do protótipo	Compila	Erro
+int x; int f(int x); ou char x; int f(int x);	Compila: o parâmetro é ignorado em silêncio	Erro
+Função chamada e nunca implementada	Compila, mas o .asm tem label indefinido	Erro
+
+Causa das três primeiras linhas: o laço de argumentos usa genAssignInt(param, lexema_arg) para qualquer tipo de argumento. Um id vira o endereço da variável, um char ou float vira texto inválido para o NASM, e um ID seguido de operador é tratado como argumento puro.
+
+O que modificar
+1. ER() e TR(): aceitar , no fim da expressão
+
+Sem isso, soma(a+1, 5) falha (só funciona quando a expressão vem antes de )). Nas duas listas, logo após CLOSE_PAR:
+
+c
+lookahead->tag == CLOSE_PAR   ||
+lookahead->tag == COMMA       ||    // novo
+2. statement(): substituir o laço de argumentos da chamada
+
+Troque o while(lookahead->tag != CLOSE_PAR ...) inteiro (até o } antes de “Verifica a quantidade total”) por:
+
+c
+while(lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN){
+    char lexema_arg[MAX_CHAR];
+    int arg_tag = lookahead->tag;
+    char *param_name;
+    int param_type;
+    strcpy(lexema_arg, lookahead->lexema);
+
+    if (cont_params >= search_symbol_func->n_params) {   // argumentos demais
+        printf("[ERRO SEMANTICO] Chamada de '%s' com argumentos demais (o prototipo declara %d).\n",
+               id_name, search_symbol_func->n_params);
+        erro_semantico = true;
+        break;
+    }
+    param_name = search_symbol_func->params[cont_params].name;
+    param_type = search_symbol_func->params[cont_params].type;
+
+    if (arg_tag == ID && (peekChar() == ',' || peekChar() == ')')) {
+        // id puro: MESMO id e mesmo tipo do parametro. O valor ja esta na global: nao gera codigo.
+        type_symbol_table_entry *var = sym_find(lexema_arg, &global_symbol_table_variables);
+        if (var == NULL) {
+            printf("[ERRO SEMANTICO] Variavel '%s' nao declarada usada como parametro.\n", lexema_arg);
+            erro_semantico = true;
+        } else if (strcmp(lexema_arg, param_name) != 0) {
+            printf("[ERRO SEMANTICO] Chamada de '%s': o argumento %d deveria ter o id '%s' (do prototipo), mas foi '%s'.\n",
+                   id_name, cont_params + 1, param_name, lexema_arg);
+            erro_semantico = true;
+        } else if (var->type != param_type) {
+            printf("[ERRO SEMANTICO] Parametro %d incompativel na chamada da funcao '%s'.\n", cont_params + 1, id_name);
+            erro_semantico = true;
+        }
+        match(ID);
+    }
+    else if (arg_tag == NUM_INT && (peekChar() == ',' || peekChar() == ')') && param_type == INT) {
+        genAssignInt(param_name, lexema_arg);
+        match(NUM_INT);
+    }
+    else if ((arg_tag == NUM_FLOAT || arg_tag == NUM_INT) && param_type == FLOAT) {
+        char val_float[MAX_CHAR + 4];
+        strcpy(val_float, lexema_arg);
+        if (arg_tag == NUM_INT) strcat(val_float, ".0");
+        genAssignFloat(param_name, val_float);
+        match(arg_tag);
+    }
+    else if (arg_tag == CHAR_VAL && param_type == CHAR) {
+        genAssignChar(param_name, lexema_arg);
+        match(CHAR_VAL);
+    }
+    else if (arg_tag == STRING_VAL && param_type == STRING) {
+        genAssignString(param_name, lexema_arg);
+        match(STRING_VAL);
+    }
+    else if (param_type == INT && arg_tag != STRING_VAL && arg_tag != NUM_FLOAT && arg_tag != CHAR_VAL) {
+        if (E()) {                      // expressao: resultado no topo da pilha
+            gen_assign_var(param_name);
+        } else {
+            printf("[ERRO] Expressao invalida no argumento %d da chamada de '%s'.\n", cont_params + 1, id_name);
+            erro_semantico = true;
+            break;
+        }
+    }
+    else {
+        printf("[ERRO SEMANTICO] Parametro %d incompativel na chamada da funcao '%s'.\n", cont_params + 1, id_name);
+        erro_semantico = true;
+        break;
+    }
+    cont_params++;
+
+    if (lookahead->tag == COMMA) { match(COMMA); } else { break; }
+}
+
+Antes do gen_jal(...), acrescente search_symbol_func->called = 1;.
+
+3. declaration(): parâmetro com nome já existente vira erro
+
+Troque o if (sym_find(p_name, ...) == NULL) { ... } por:
+
+c
+if (sym_find(p_name, &global_symbol_table_variables) != NULL) {
+    printf("[ERRO] Parametro '%s' da funcao '%s' ja existe como variavel/parametro global (parametros sao globais).\n", p_name, var_name);
+    erro_sintatico = true;
+    return false;
+}
+void *val_init = NULL;
+if (p_type == INT)        { val_init = malloc(sizeof(int));   *((int*)val_init) = 0; }
+else if (p_type == FLOAT) { val_init = malloc(sizeof(float)); *((float*)val_init) = 0.0f; }
+else if (p_type == CHAR)  { val_init = malloc(sizeof(char));  *((char*)val_init) = '\0'; }
+else                      { val_init = malloc(MAX_CHAR);      strcpy((char*)val_init, ""); }
+sym_declare(p_name, p_type, 0, val_init, &global_symbol_table_variables);
+
+Isso também corrige a alocação: hoje todo parâmetro aloca sizeof(int), mesmo float, char ou string.
+
+4. func_codes(): validar a implementação
+
+No symbols.h (struct da função), adicione int implemented; e int called;, e zere os dois em sym_func_declare e initSymbolTableFunc. Reescreva func_codes() para:
+
+Buscar a função na TSF logo depois do nome.
+Dar erro se não existe, se já foi implementada ou se o tipo difere do protótipo.
+Ler os parâmetros em vez de pular, comparando quantidade, tipo e nome com o protótipo.
+Verificar o retorno de todos os match() internos.
+Marcar func->implemented = 1 ao final.
+No fim, dar erro se alguma função tem called && !implemented.
