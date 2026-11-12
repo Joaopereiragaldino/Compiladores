@@ -136,6 +136,10 @@ type_symbol_table_func_entry *sym_func_find(char *f_name){
  */
 type_symbol_table_func_entry *sym_func_declare(char *name, int type, type_symbol_table_entry params[MAX_PARAMS], int n_params) {
     int i, pos;
+    if (n_params > MAX_PARAMS || n_params < 0) {
+        printf("[ERRO] Quantidade de parametros (%d) invalida ou excede o limite maximo (%d) na funcao '%s'.\n", n_params, MAX_PARAMS, name);
+        return NULL;
+    }
     if (symbol_table_func.n_funcs < MAX_FUNCS) {
         pos = symbol_table_func.n_funcs;
         strcpy(symbol_table_func.funcs[pos].name, name);
@@ -146,10 +150,12 @@ type_symbol_table_func_entry *sym_func_declare(char *name, int type, type_symbol
             symbol_table_func.funcs[pos].params[i].type = params[i].type;            
         }
         symbol_table_func.funcs[pos].n_params = n_params;
+        symbol_table_func.funcs[pos].implemented = 0;
+        symbol_table_func.funcs[pos].called = 0;
         symbol_table_func.n_funcs++;
         return &symbol_table_func.funcs[pos];
     } else {
-        printf("[ERRO] Limite de declaracao de funções atingido.");
+        printf("[ERRO] Limite de declaracao de funções atingido.\n");
     }
     return NULL;
 }
@@ -194,6 +200,8 @@ void initSymbolTableFunc() {
         strcpy(symbol_table_func.funcs[i].name, "");
         symbol_table_func.funcs[i].type = 0;
         symbol_table_func.funcs[i].n_params = 0;
+        symbol_table_func.funcs[i].implemented = 0;
+        symbol_table_func.funcs[i].called = 0;
     }
 }
 
@@ -241,6 +249,8 @@ void printSTFunc() {
         printf("\tFuncao[%d].name: %s\n", i, symbol_table_func.funcs[i].name);
         printf("\tFuncao[%d].tipo: %d\n", i, symbol_table_func.funcs[i].type);
         printf("\tFuncao[%d].n_param: %d\n", i, symbol_table_func.funcs[i].n_params);
+        printf("\tFuncao[%d].implemented: %d\n", i, symbol_table_func.funcs[i].implemented);
+        printf("\tFuncao[%d].called: %d\n", i, symbol_table_func.funcs[i].called);
         printf("\tFuncao[%d].parametros:\n", i);
         for (j=0; j < symbol_table_func.funcs[i].n_params; j++) {
             printf("\t\ttipo: %d\n", symbol_table_func.funcs[i].params[j].type);

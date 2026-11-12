@@ -61,6 +61,8 @@ struct st_symbol_func_entry {
     char label[MAX_TOKSZ];
     type_symbol_table_entry params[MAX_PARAMS];
     int n_params;
+    int implemented;
+    int called;
 };
 typedef struct st_symbol_func_entry type_symbol_table_func_entry;
 
