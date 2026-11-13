@@ -20,4 +20,4 @@ tst_lex.o: tst_lex.c
 	gcc -c -g tst_lex.c
 
 clean:
-	del /Q *.o compiler.exe tstLexCompiler.exe
+	rm -f *.o compiler.exe tstLexCompiler.exe

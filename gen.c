@@ -292,6 +292,23 @@ void gen_assign_var(char *id) {
 }
 
 /**
+ * @brief Copia o valor de uma variavel de origem para uma variavel de destino (parametro)
+ */
+void gen_copy_var(char *dest, char *src, int type) {
+    if (type == INT || type == FLOAT) {
+        fprintf(output_file, "\t; Copia variavel %s para parametro %s\n", src, dest);
+        fprintf(output_file, "\tmov eax, dword [%s]\n", src);
+        fprintf(output_file, "\tmov dword [%s], eax\n", dest);
+    } else if (type == CHAR) {
+        fprintf(output_file, "\t; Copia variavel char %s para parametro %s\n", src, dest);
+        fprintf(output_file, "\tmov al, byte [%s]\n", src);
+        fprintf(output_file, "\tmov byte [%s], al\n", dest);
+    } else if (type == STRING) {
+        fprintf(output_file, "\t; Atribuicao de string para %s a partir de %s\n", dest, src);
+    }
+}
+
+/**
  * @brief Empilha o valor da variavel para contas e comparacoes
  */
 void gen_push_var(char *id) {

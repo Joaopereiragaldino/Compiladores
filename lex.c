@@ -87,10 +87,10 @@ type_token *getToken() {
         }
         strcpy( token->lexema, buffer ); //copia buffer para lexema
     } 
-    else if ( isalpha(ch) ) { //Verifica se entrada eh um alfa-numerico (palavra reservada ou identificador)
+    else if ( isalpha(ch) || ch == '_' ) { //Verifica se entrada eh um alfa-numerico (palavra reservada ou identificador)
         buffer[pos_buffer++] = ch;
         ch = fgetc(input_file);
-        while( isalnum(ch) ) {
+        while( isalnum(ch) || ch == '_' ) {
             buffer[pos_buffer++] = ch;
             ch = fgetc(input_file);
         }

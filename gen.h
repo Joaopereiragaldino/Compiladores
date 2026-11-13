@@ -36,6 +36,7 @@ void genAssignFloat(char *id, char *value);
 void genAssignChar(char *id, char *value);
 void genAssignString(char *id, char *value);
 void gen_assign_var(char *id);
+void gen_copy_var(char *dest, char *src, int type);
 void gen_push_var(char *id);
 void gen_push_char(char *id);
 
