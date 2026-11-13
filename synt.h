@@ -1,12 +1,3 @@
-/**
- * @file synt.h
- * @author Prof. Ivairton M. Santos - UFMT - Computacao
- * @brief Modulo do analisado sintatico
- * @version 0.4
- * @date 2022-02-04
- * 
- */
-
 #ifndef _SYNT_H_
 #define _SYNT_H_
 

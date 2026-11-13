@@ -1,12 +1,3 @@
-/**
- * @file lex.c
- * @author Prof. Ivairton M. Santos - UFMT - Computacao
- * @brief Codificacao do modulo do analisador lexico
- * @version 0.3
- * @date 2021-12-09
- * 
- */
-
 // Inclusao do cabecalho
 #include "lex.h"
 

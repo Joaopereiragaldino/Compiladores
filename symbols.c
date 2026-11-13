@@ -1,10 +1,3 @@
-/**
- * @file symbols.c
- * @author Prof. Ivairton M. Santos - UFMT - Computacao
- * @brief Modulo do gerador da tabela de simbolos
- * @version 0.1
- * @date 2022-02-04
- */
 #include "symbols.h"
 
 //extern int nstringconsts;

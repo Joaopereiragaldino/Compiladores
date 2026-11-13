@@ -112,13 +112,6 @@ label3:
 	; Empilha variavel i
 	mov eax, dword [i]
 	push rax
-	; Armazenamento de numero
-	mov rax,5
-	push rax
-	pop rax
-	pop rbx
-	add rax,rbx
-	push rax
 	; Atribuicao de valor em variavel
 	pop rax
 	mov dword [x], eax

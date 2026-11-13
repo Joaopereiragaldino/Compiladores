@@ -1,11 +1,3 @@
-/**
- * @file synt.c
- * @author Prof. Ivairton M. Santos - UFMT - Computacao
- * @brief Codificacao do modulo do analisador sintatico
- * @version 0.4
- * 
- */
-
 #include "synt.h"
 
 // Variaveis globais
@@ -48,7 +40,7 @@ int program (void) {
         if (!match(OPEN_BRACE)) return false;
     }
     else {
-        printf("[ERRO] Esperado 'begin' ou '}' para iniciar o bloco principal.\n");
+        printf("[ERRO] Esperado 'begin' ou '{' para iniciar o bloco principal.\n");
         erro_sintatico = true;
         return false;
     }
@@ -62,7 +54,7 @@ int program (void) {
         if (!match(CLOSE_BRACE)) return false;
     }
     else {
-        printf("[ERRO] Esperado 'end' ou '{' para encerrar o bloco principal.\n");
+        printf("[ERRO] Esperado 'end' ou '}' para encerrar o bloco principal.\n");
         erro_sintatico = true;
         return false;
     }
@@ -366,15 +358,16 @@ int declaration (void) {
             return false;
         }
     } 
-    else if(var_type == IF || 
-            var_type == WHILE || 
-            var_type == READ || 
-            var_type == WRITE || 
-            var_type == ID || 
-            var_type == ENDTOKEN || 
-            var_type == END || 
+    else if(var_type == IF          || 
+            var_type == WHILE       || 
+            var_type == READ        || 
+            var_type == WRITE       || 
+            var_type == ID          || 
+            var_type == ENDTOKEN    || 
+            var_type == END         || 
             var_type == CLOSE_BRACE ||
-            var_type == BEGIN) {
+            var_type == BEGIN       ||
+            var_type == OPEN_BRACE) {
         return false;         
     } else {
         printf ("[ERRO] Tipo desconhecido na declaracao: %d %s.\n", lookahead->tag, lookahead->lexema);
