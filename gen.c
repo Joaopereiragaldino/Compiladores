@@ -1,12 +1,3 @@
-/**
- * @file gen.c
- * @author Ivairton M. Santos - UFMT - Computacao
- * @brief Codificacao do modulo gerador de codigo
- * @version 0.2
- * @date 2022-02-04
- * 
- */
-
 // Inclusao do cabecalho
 #include "gen.h"
 

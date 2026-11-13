@@ -1,12 +1,3 @@
-/**
- * @file lex.h
- * @author Prof. Ivairton M. Santos
- * @brief Modulo do analisador lexico
- * @version 0.3
- * @date 2021-12-09
- * 
- */
-
 #ifndef _LEX_H_
 #define _LEX_H_
 

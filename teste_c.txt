@@ -1,0 +1,40 @@
+int i;
+float f;
+char c;
+string s;
+int g;
+
+int calculo(int x, int y);
+int mostrar(int valor);
+
+{
+    i = 0;
+    f = 1.5;
+    c = 'A';
+    s = "Teste Compilador";
+    g = 10;
+
+    read i;
+
+    if (i < 10) {
+        i = i + 1;
+    } else {
+        i = 0;
+    }
+
+    while (i > 0) begin
+        i = i - 1;
+    end
+
+    calculo(i, g);
+    mostrar(valor);
+}
+
+int calculo(int x, int y) {
+    x = x + y;
+}
+
+int mostrar(int valor) begin
+    valor = valor + 48;
+    write valor;
+end

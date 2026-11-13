@@ -1,13 +1,3 @@
-/**
- * @file struct_compiler.h
- * @author Prof. Ivairton M. Santos - UFMT - Computacao
- * @brief Modulo para definicao de constantes e estruturas de dados do Sistema
- *        Compilador de C Simplificado
- * @version 0.3
- * @date 2021-12-09
- * 
- */
-
 #ifndef _STRUCT_COMPILER_
 #define _STRUCT_COMPILER_
 
