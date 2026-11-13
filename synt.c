@@ -97,8 +97,8 @@ void func_codes(void) {
             erro_sintatico = true;
             return;
         }
-        if(func->type != var_type){
-            printf("[ERRO] A tipo da funcao prototipada é diferente do tipo que foi implementada\n");
+        if (func->type != var_type) {
+            printf("[ERRO] O tipo da funcao '%s' implementada (%d) difere do tipo do prototipo (%d).\n", f_name, var_type, func->type);
             erro_sintatico = true;
             return;
         }
@@ -192,6 +192,7 @@ void func_codes(void) {
         gen_jr(); // Gera instrucao de retorno (ret)
         func->implemented = 1;
     }
+  
     // Verifica se alguma funcao chamada nao foi implementada
     int i;
     for (i = 0; i < symbol_table_func.n_funcs; i++) {
@@ -298,32 +299,29 @@ int declaration (void) {
                             erro_sintatico = true;
                             return false;
                         }
+
                         parameters[n_params].type = p_type;
                         strcpy(parameters[n_params].name, p_name);
                         n_params++;
 
-                        if(p_type == INT){
-                            void *val_init = malloc(sizeof(int));
+                        void *val_init = NULL;
+                        if (p_type == INT) { 
+                            val_init = malloc(sizeof(int));   
                             *((int*)val_init) = 0;
+                        } else if (p_type == FLOAT) {
+                            val_init = malloc(sizeof(float));
+                            *((float*)val_init) = 0.0f;
+                        } else if (p_type == CHAR) {
+                            val_init = malloc(sizeof(char));
+                            *((char*)val_init) = '\0';
+                        }
+                        else if(p_type == STRING) {
+                            val_init = malloc(MAX_CHAR * sizeof(char));
+                            strcpy((char*)val_init, "");
+                        }
+                        if (val_init != NULL) {
                             sym_declare(p_name, p_type, 0, val_init, &global_symbol_table_variables);
                         }
-                        else if(p_type == FLOAT){
-                            void *val_float = malloc(sizeof(float));
-                            *((float*)val_float) = 0.0f;
-                            sym_declare(p_name, p_type, 0, val_float, &global_symbol_table_variables);
-                        } 
-                        else if(p_type == CHAR){
-                            void *val_char = malloc(sizeof(char));
-                            *((char*)val_char) = '\0';
-                            sym_declare(p_name, p_type, 0, val_char, &global_symbol_table_variables);
-                        }
-                            
-                        else if(p_type == STRING){
-                            void *val_string = malloc(MAX_CHAR * sizeof(char));
-                            strcpy((char*)val_string, "");
-                            sym_declare(p_name, p_type, 0, val_string, &global_symbol_table_variables);
-                        }
-                        
                         if(lookahead->tag == COMMA){
                             if (!match(COMMA)) return false;
                             if(lookahead->tag != INT && lookahead->tag != FLOAT && lookahead->tag != CHAR && lookahead->tag != STRING){
@@ -331,6 +329,8 @@ int declaration (void) {
                                 erro_sintatico = true;
                                 return false;
                             }
+                        } else {
+                            break;
                         }
                     } else {
                         break;
@@ -535,6 +535,8 @@ int statement (void) {
 
             while(lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN){
                 int arg_tag = lookahead->tag;
+                char lexema_arg[MAX_CHAR];
+                strcpy(lexema_arg, lookahead->lexema);
                 char *param_name;
                 int param_type;
 
@@ -554,65 +556,119 @@ int statement (void) {
                 if (arg_tag == CHAR_VAL) {
                     if (param_type != CHAR) {
                         printf("[ERRO SEMANTICO] Argumento %d (char) incompativel com o prototipo na chamada de '%s'.\n", cont_params + 1, id_name);
+                if (arg_tag == ID && (peekChar() == ',' || peekChar() == ')')) {
+                    // id puro: MESMO id e mesmo tipo do parametro. O valor ja esta na global: nao gera codigo.
+                    type_symbol_table_entry *var = sym_find(lexema_arg, &global_symbol_table_variables);
+                    if (var == NULL) {
+                        printf("[ERRO SEMANTICO] Variavel '%s' nao declarada usada como parametro.\n", lexema_arg);
+                        erro_semantico = true;
+                    } else if (var->type != param_type) {
+                        printf("[ERRO SEMANTICO] Parametro %d incompativel na chamada da funcao '%s'.\n", cont_params + 1, id_name);
                         erro_semantico = true;
                     } else {
                         char lexema_arg[MAX_CHAR];
                         strcpy(lexema_arg, lookahead->lexema);
                         genAssignChar(param_name, lexema_arg);
                     }
-                    match(CHAR_VAL);
-                }
-                // --- Argumento: constante STRING ---
-                else if (arg_tag == STRING_VAL) {
-                    if (param_type != STRING) {
-                        printf("[ERRO SEMANTICO] Argumento %d (string) incompativel com o prototipo na chamada de '%s'.\n", cont_params + 1, id_name);
-                        erro_semantico = true;
-                    } else {
-                        char lexema_arg[MAX_CHAR];
-                        strcpy(lexema_arg, lookahead->lexema);
-                        genAssignString(param_name, lexema_arg);
+// --- Argumento: constante CHAR ---
+if (arg_tag == CHAR_VAL) {
+    if (param_type != CHAR) {
+        printf("[ERRO SEMANTICO] Argumento %d (char) incompativel com o prototipo na chamada de '%s'.\n",
+               cont_params + 1, id_name);
+        erro_semantico = true;
+    } else {
+        genAssignChar(param_name, lexema_arg);
+    }
+
+    match(CHAR_VAL);
+}
+
+// --- Argumento: constante STRING ---
+else if (arg_tag == STRING_VAL) {
+    if (param_type != STRING) {
+        printf("[ERRO SEMANTICO] Argumento %d (string) incompativel com o prototipo na chamada de '%s'.\n",
+               cont_params + 1, id_name);
+        erro_semantico = true;
+    } else {
+        genAssignString(param_name, lexema_arg);
+    }
+
+    match(STRING_VAL);
+}
+
+// --- Argumento: numero inteiro ou float ---
+else if (arg_tag == NUM_INT || arg_tag == NUM_FLOAT) {
+
+    if (param_type == INT && arg_tag == NUM_INT) {
+        genAssignInt(param_name, lexema_arg);
+        match(NUM_INT);
+    }
+    else if (param_type == FLOAT) {
+        char val_float[MAX_CHAR + 4];
+
+        strcpy(val_float, lexema_arg);
+
+        if (arg_tag == NUM_INT) {
+            strcat(val_float, ".0");
+        }
+
+        genAssignFloat(param_name, val_float);
+        match(arg_tag);
+    }
+    else {
+        printf("[ERRO SEMANTICO] Tipo de argumento incompativel com o parametro %d da funcao '%s'.\n",
+               cont_params + 1, id_name);
+        erro_semantico = true;
+        match(arg_tag);
+    }
+}
+
+// --- Argumento: variável ou expressão ---
+else if (arg_tag == ID || arg_tag == OPEN_PAR) {
+
+    if (param_type == INT) {
+        // E() analisa a expressão e gen_assign_var()
+        // transfere seu resultado para o parâmetro.
+        if (E()) {
+            gen_assign_var(param_name);
+        } else {
+            printf("[ERRO] Expressao invalida no argumento %d da chamada de '%s'.\n",
+                   cont_params + 1, id_name);
+            erro_semantico = true;
+        }
+    }
+    else {
+        printf("[ERRO SEMANTICO] Argumento variavel/expressao incompativel com o parametro %d da funcao '%s'.\n",
+               cont_params + 1, id_name);
+        erro_semantico = true;
+
+        while (lookahead->tag != CLOSE_PAR &&
+               lookahead->tag != ENDTOKEN &&
+               lookahead->tag != SEMICOLON &&
+               lookahead->tag != COMMA) {
+            lookahead = getToken();
+        }
+    }
+}
+
+// --- Tipo de argumento desconhecido ---
+else {
+    printf("[ERRO SEMANTICO] Argumento %d incompativel com o prototipo na chamada de '%s'.\n",
+           cont_params + 1, id_name);
+    erro_semantico = true;
+
+    while (lookahead->tag != CLOSE_PAR &&
+           lookahead->tag != ENDTOKEN &&
+           lookahead->tag != SEMICOLON &&
+           lookahead->tag != COMMA) {
+        lookahead = getToken();
+    }
+}
                     }
-                    match(STRING_VAL);
+                    break;
                 }
-                // --- Argumento: expressao aritmetica/numerica (INT ou FLOAT) ---
-                else if (arg_tag == NUM_INT || arg_tag == NUM_FLOAT || arg_tag == ID || arg_tag == OPEN_PAR) {
-                    if (param_type == FLOAT) {
-                        // Argumento float: apenas constante float/int simples
-                        char lexema_arg[MAX_CHAR + 4];
-                        strcpy(lexema_arg, lookahead->lexema);
-                        if (arg_tag == NUM_INT) {
-                            strcat(lexema_arg, ".0");
-                            genAssignFloat(param_name, lexema_arg);
-                            match(NUM_INT);
-                        } else if (arg_tag == NUM_FLOAT) {
-                            genAssignFloat(param_name, lexema_arg);
-                            match(NUM_FLOAT);
-                        } else {
-                            printf("[ERRO SEMANTICO] Argumento %d incompativel com parametro float na chamada de '%s'.\n", cont_params + 1, id_name);
-                            erro_semantico = true;
-                            while (lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN && lookahead->tag != SEMICOLON && lookahead->tag != COMMA)
-                                lookahead = getToken();
-                        }
-                    } else if (param_type == INT) {
-                        // Argumento int: pode ser expressao aritmetica completa (E)
-                        if (E()) {
-                            gen_assign_var(param_name);
-                        } else {
-                            printf("[ERRO] Expressao invalida no argumento %d da chamada de '%s'.\n", cont_params + 1, id_name);
-                            erro_semantico = true;
-                            while (lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN && lookahead->tag != SEMICOLON && lookahead->tag != COMMA)
-                                lookahead = getToken();
-                        }
-                    } else if (param_type == STRING || param_type == CHAR) {
-                        printf("[ERRO SEMANTICO] Argumento %d (numero/id) incompativel com o prototipo na chamada de '%s'.\n", cont_params + 1, id_name);
-                        erro_semantico = true;
-                        while (lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN && lookahead->tag != SEMICOLON && lookahead->tag != COMMA)
-                            lookahead = getToken();
-                    }
-                }
-                // --- Tipo desconhecido/incompativel ---
                 else {
-                    printf("[ERRO SEMANTICO] Argumento %d incompativel com o prototipo na chamada de '%s'.\n", cont_params + 1, id_name);
+                    printf("[ERRO SEMANTICO] Parametro %d incompativel na chamada da funcao '%s'.\n", cont_params + 1, id_name);
                     erro_semantico = true;
                     while (lookahead->tag != CLOSE_PAR && lookahead->tag != ENDTOKEN && lookahead->tag != SEMICOLON) {
                         lookahead = getToken();
